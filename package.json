@@ -1,0 +1,11 @@
+{
+  "name": "json-to-swagger",
+  "version": "0.0.1",
+  "description": "Create a swagger definition from a jsonfile. Assuming serve by json-server.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "stonerich",
+  "license": "ISC"
+}
