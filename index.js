@@ -8,11 +8,29 @@
  */
 
 
-console.log("Starting");
 
-let fs = require('fs');
+console.log("Starting", process.argv);
 
-fs.readFile('posts.json', function (e, data) {
+const  fs = require('fs');
+const commandLineArgs = require('command-line-args');
+
+const optionDefinitions = [
+  {name : "host", type:String, defaultValue: "localhost:3000"},
+  {name : "input", alias:"i", type:String, defaultValue: "db.json" },
+  {name : "output", alias:"o", type:String, defaultValue: "swagger.json"}
+];
+
+let options = {
+  host: "",
+  input: "",
+  output: ""
+};
+options = commandLineArgs(optionDefinitions);
+console.log("Options : ", options);
+
+
+
+fs.readFile(options.input, function (e, data) {
 
   try {
     let jsonData = JSON.parse(data.toString());
@@ -29,7 +47,7 @@ fs.readFile('posts.json', function (e, data) {
 
 
     // Write out the result
-    let stream = fs.createWriteStream('output.json');
+    let stream = fs.createWriteStream(options.output);
     stream.once('open', function (/* fd */) {
 
       let resultString = JSON.stringify(swaggerData, null, '  ');
@@ -51,9 +69,11 @@ fs.readFile('posts.json', function (e, data) {
 /**
  * Create basic data for the swagger spec.
  * A lot of stuff hardcoded for now.
- * @returns {{swagger: string, info: {title: string, version: string}, consumes: string, produces: string, host: string, schemes: [string,string], paths: {}, definitions: {}}}
+ * @returns {{swagger: string,
+ *    info: {title: string, version: string},
+ *    consumes: [string], produces: [string], host: string, schemes: [string,string], paths: {}, definitions: {}}}
  */
-function createSwaggerBase() {
+function createSwaggerBase(){
 
   let info = {
     title: "json-server api",
@@ -64,8 +84,8 @@ function createSwaggerBase() {
     "info": info,
     consumes: ["application/json"],
     produces: ["application/json"],
-    host: "localhost:3000",
-    schemes: ["http", "https"],
+    host: options.host,
+    schemes: ["http"],
     paths: {},
     definitions: {}
   };
@@ -106,16 +126,10 @@ function createSwaggerRoot(swaggerData, restRootName, restRootData) {
 // Create basic swagger specification for a given
 // data objecct
 
-/**
- * Create the basic specifications for a path where
- * get returns all info and post adds a new element
- * @param isArray
- * @param typeName
- * @returns {{get: {}}}
- */
-function createBasicSpec(isArray, typeName) {
-
+function createRootGetSpecification(isArray, typeName) {
   let getSpec = {};
+  let respSchema = {};
+
   getSpec.summary = isArray ? `Get all ${typeName}` : `Get the ${typeName}`;
   getSpec.description = isArray
     ? `Get the instances of ${typeName} that matches the search conditions`
@@ -124,13 +138,14 @@ function createBasicSpec(isArray, typeName) {
     ? 'getall' + typeName
     : 'get' + typeName;
 
-  let respSchema = {};
+
   if (isArray) {
     respSchema.type = "array";
     respSchema.items = {
       "$ref": `#/definitions/${typeName}`
     }
-  } else {
+  }
+  else {
     respSchema["$ref"] = `#/definitions/${typeName}`;
   }
 
@@ -142,9 +157,54 @@ function createBasicSpec(isArray, typeName) {
       "schema": respSchema
     }
   };
-
   getSpec.responses = responses;
-  return {"get": getSpec};
+  return getSpec;
+}
+
+
+function createRootPostSpecification(typeName)
+{
+  let postSpec = {};
+  let respSchema = {};
+  let parameters = {};
+  postSpec.summary = `Post a new ${typeName}`;
+  postSpec.description = `Add a new ${typeName}`;
+  postSpec.operationId = "post" + typeName;
+
+  parameters.in = "body";
+  parameters.name = "bodyAdd" + typeName;
+  parameters.description = typeName + " object to be added";
+  parameters.required= true;
+  parameters.schema = {"$ref": "#/definitions/" + typeName};
+
+  respSchema["$ref"] = `#/definitions/${typeName}`;
+  let responses =  {
+    "200": {
+      "description" : "The added pet",
+      "schema": respSchema
+    }
+  };
+  postSpec.parameters = [parameters];
+  postSpec.responses = responses;
+  return postSpec;
+
+}
+
+
+/**
+ * Create the basic specifications for a path where
+ * get returns all info and post adds a new element
+ * @param isArray
+ * @param typeName
+ * @returns {{get: {}}}
+ */
+function createBasicSpec(isArray, typeName) {
+  let getSpec = createRootGetSpecification(isArray, typeName);
+  let postSpec = createRootPostSpecification(typeName);
+  return {
+    "get": getSpec,
+    "post": postSpec
+    };
 
 }
 
@@ -156,9 +216,36 @@ function createTypeDef(typeExemplar) {
     properties: {}
   };
 
-  for (let propertyExpemplar in typeExemplar) {
-    let dataExemplar = typeExemplar[propertyExpemplar];
-    console.log(propertyExpemplar + " ---> " + dataExemplar + ":" + typeof(dataExemplar))
+  for (let propertyExemplar in typeExemplar) {
+    let dataExemplar = typeExemplar[propertyExemplar];
+    let dataType = typeof(dataExemplar);
+    let swaggerType = dataType;
+    if (dataType === "object") {
+      console.log("Nested objects not implemented :", propertyExemplar);
+    } else if (dataType === "number") {
+      if (Number.isInteger(dataExemplar)) {
+        typeDef.properties[propertyExemplar] = {
+          "type": "integer",
+          "format": "int64"
+        };
+        swaggerType = "integer";
+      } else {
+        typeDef.properties[propertyExemplar] = {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    } else if (dataType === "string") {
+      typeDef.properties[propertyExemplar] = {
+        "type" : "string"
+      };
+    } else {
+      console.warn("Unhandled type for " + propertyExemplar + " " + typeof(propertyExemplar));
+    }
+
+
+    console.log(propertyExemplar + " ---> " + dataExemplar + ":" + swaggerType)
+
   }
   return typeDef;
 }

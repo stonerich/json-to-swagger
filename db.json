@@ -1,0 +1,64 @@
+{
+  "posts": [
+    {
+      "id": 1,
+      "title": "json-server",
+      "author": "typicode"
+    },
+    {
+      "id": 2,
+      "title": "fun post",
+      "author": "typicode"
+    },
+    {
+      "title": "good stuff",
+      "author": "micke",
+      "id": 3
+    },
+    {
+      "title": "A hot and cool post",
+      "author": "blurb",
+      "id": 4
+    },
+    {
+      "id": 6,
+      "title": "A hot and cool post 2",
+      "author": "blurb"
+    },
+    {
+      "title": "A hot and cool post 3",
+      "author": "blurb",
+      "id": 7
+    },
+    {
+      "id": 100,
+      "title": "A hot and cool post 4",
+      "author": "blurb"
+    },
+    {
+      "title": "A hot and cool post 5",
+      "author": "blurb",
+      "id": 101
+    },
+    {
+      "id": 50,
+      "title": "A hot and cool post 5",
+      "author": "blurb"
+    },
+    {
+      "id": 102,
+      "title": "A hot and cool post 6",
+      "author": "blurb"
+    }
+  ],
+  "comments": [
+    {
+      "id": 1,
+      "body": "some comment",
+      "postId": 1
+    }
+  ],
+  "profile": {
+    "name": "typicode"
+  }
+}

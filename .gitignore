@@ -1,2 +1,6 @@
-output.json
+swagger.json
 .idea
+db2.json
+demo.yaml
+node_modules/
+out.json
