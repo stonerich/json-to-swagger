@@ -9,8 +9,6 @@
 
 
 
-console.log("Starting", process.argv);
-
 const  fs = require('fs');
 const commandLineArgs = require('command-line-args');
 
@@ -26,8 +24,8 @@ let options = {
   output: ""
 };
 options = commandLineArgs(optionDefinitions);
-console.log("Options : ", options);
 
+console.log("Generating swagger file " + options.output + " from data in " + options.input);
 
 
 fs.readFile(options.input, function (e, data) {
@@ -104,7 +102,6 @@ function createSwaggerBase(){
  * @param restRootData The data defined for this path
  */
 function createSwaggerRoot(swaggerData, restRootName, restRootData) {
-  console.log("Adding :" + restRootName);
   let typeName = restRootName;
   // Simple attempt to move plural namning to singular and to have uppercase typenames
   if (typeName.endsWith('s')) {
@@ -114,9 +111,6 @@ function createSwaggerRoot(swaggerData, restRootName, restRootData) {
 
   let isArray = Array.isArray(restRootData);
   let dataExemplar = isArray ? restRootData[0] : restRootData;
-  console.log(typeName + " is array? " + isArray);
-
-  console.log("Typename ", typeName);
 
   swaggerData.paths["/" + restRootName] = createBasicSpec(isArray, typeName);
   swaggerData.definitions[typeName] = createTypeDef(dataExemplar);
@@ -221,7 +215,7 @@ function createTypeDef(typeExemplar) {
     let dataType = typeof(dataExemplar);
     let swaggerType = dataType;
     if (dataType === "object") {
-      console.log("Nested objects not implemented :", propertyExemplar);
+      console.warn("Nested objects not implemented :", propertyExemplar);
     } else if (dataType === "number") {
       if (Number.isInteger(dataExemplar)) {
         typeDef.properties[propertyExemplar] = {
@@ -243,8 +237,6 @@ function createTypeDef(typeExemplar) {
       console.warn("Unhandled type for " + propertyExemplar + " " + typeof(propertyExemplar));
     }
 
-
-    console.log(propertyExemplar + " ---> " + dataExemplar + ":" + swaggerType)
 
   }
   return typeDef;
