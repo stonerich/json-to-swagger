@@ -9,13 +9,13 @@
 
 
 
-const  fs = require('fs');
+const fs = require('fs');
 const commandLineArgs = require('command-line-args');
 
 const optionDefinitions = [
-  {name : "host", type:String, defaultValue: "localhost:3000"},
-  {name : "input", alias:"i", type:String, defaultValue: "db.json" },
-  {name : "output", alias:"o", type:String, defaultValue: "swagger.json"}
+  {name: "host", type: String, defaultValue: "localhost:3000"},
+  {name: "input", alias: "i", type: String, defaultValue: "db.json"},
+  {name: "output", alias: "o", type: String, defaultValue: "swagger.json"}
 ];
 
 let options = {
@@ -39,7 +39,7 @@ fs.readFile(options.input, function (e, data) {
     let swaggerData = createSwaggerBase();
     for (let restRoot in jsonData) {
       if (jsonData.hasOwnProperty(restRoot)) {
-        createSwaggerRoot(swaggerData, restRoot, jsonData[restRoot]);
+        createSwaggerForType(swaggerData, restRoot, jsonData[restRoot]);
       }
     }
 
@@ -71,7 +71,7 @@ fs.readFile(options.input, function (e, data) {
  *    info: {title: string, version: string},
  *    consumes: [string], produces: [string], host: string, schemes: [string,string], paths: {}, definitions: {}}}
  */
-function createSwaggerBase(){
+function createSwaggerBase() {
 
   let info = {
     title: "json-server api",
@@ -91,9 +91,6 @@ function createSwaggerBase(){
   return swagger;
 }
 
-//
-//
-//
 
 /**
  * Create the root path spec and the typedefs for a root with its data
@@ -101,7 +98,7 @@ function createSwaggerBase(){
  * @param restRootName Root path given
  * @param restRootData The data defined for this path
  */
-function createSwaggerRoot(swaggerData, restRootName, restRootData) {
+function createSwaggerForType(swaggerData, restRootName, restRootData) {
   let typeName = restRootName;
   // Simple attempt to move plural namning to singular and to have uppercase typenames
   if (typeName.endsWith('s')) {
@@ -113,12 +110,62 @@ function createSwaggerRoot(swaggerData, restRootName, restRootData) {
   let dataExemplar = isArray ? restRootData[0] : restRootData;
 
   swaggerData.paths["/" + restRootName] = createBasicSpec(isArray, typeName);
-  swaggerData.definitions[typeName] = createTypeDef(dataExemplar);
+  if (isArray) {
+    swaggerData.paths["/" + restRootName + "/{id}"] = createIndividualSpec(typeName, dataExemplar);
+  }
+  // swaggerData.definitions[typeName] = createTypeDef(swaggerData, typeName, dataExemplar);
+  createTypeDef(swaggerData, typeName, dataExemplar);
+}
+
+
+function createIndividualGetSpec(typeName, dataExemplar) {
+  let result = {};
+  result.summary = "Return an individual " + typeName + " with given id";
+  result.description = "Return an individual " + typeName + " with given id";
+  result.operationId = "get" + typeName + "Individual";
+
+  let responses = {};
+  responses["200"] = {
+    description: typeName + " response",
+    schema: {
+      type: "object",
+
+    }
+  };
+
+  return result;
+
+}
+
+
+/**
+ * Create the specification needed for an individual of the typename.
+ * FORNOW: Assumes that the id attribute is named 'id'
+ * @param typeName
+ * @param dataExemplar
+ */
+function createIndividualSpec(typeName, dataExemplar) {
+
+  let get = createIndividualGetSpec(typeName, dataExemplar);
+  let parameters = {
+    name: "id",
+    in: "path",
+    description: "Id for " + typeName,
+    required: true,
+    type: "integer",
+    format: "int64"
+  };
+
+  return {
+    get,
+    parameters
+  }
+
 
 }
 
 // Create basic swagger specification for a given
-// data objecct
+// data object
 
 function createRootGetSpecification(isArray, typeName) {
   let getSpec = {};
@@ -156,8 +203,7 @@ function createRootGetSpecification(isArray, typeName) {
 }
 
 
-function createRootPostSpecification(typeName)
-{
+function createRootPostSpecification(typeName) {
   let postSpec = {};
   let respSchema = {};
   let parameters = {};
@@ -168,13 +214,13 @@ function createRootPostSpecification(typeName)
   parameters.in = "body";
   parameters.name = "bodyAdd" + typeName;
   parameters.description = typeName + " object to be added";
-  parameters.required= true;
+  parameters.required = true;
   parameters.schema = {"$ref": "#/definitions/" + typeName};
 
   respSchema["$ref"] = `#/definitions/${typeName}`;
-  let responses =  {
+  let responses = {
     "200": {
-      "description" : "The added pet",
+      "description": "The added pet",
       "schema": respSchema
     }
   };
@@ -198,47 +244,67 @@ function createBasicSpec(isArray, typeName) {
   return {
     "get": getSpec,
     "post": postSpec
-    };
+  };
+
+}
+
+
+function createPropertiesForType(swaggerData, typeName, typeExemplar, includeId) {
+  let properties = {};
+
+  for (let propertyExemplar in typeExemplar) {
+    if (propertyExemplar === "id" && !includeId) continue;
+    let dataExemplar = typeExemplar[propertyExemplar];
+    let dataType = typeof(dataExemplar);
+    // let swaggerType = dataType;
+    if (dataType === "object") {
+      let localType = propertyExemplar[0].toUpperCase() + propertyExemplar.substr(1, propertyExemplar.length - 1);
+      let newTypeName = typeName + localType;
+      console.info("Generating nested typedef for " + newTypeName, dataExemplar);
+      createTypeDef(swaggerData, newTypeName, dataExemplar);
+      properties[propertyExemplar] = {
+        "$ref": "#/definitions/" + newTypeName
+      }
+    }
+    else if (dataType === "number") {
+      if (Number.isInteger(dataExemplar)) {
+        properties[propertyExemplar] = {
+          "type": "integer",
+          "format": "int64"
+        };
+        // swaggerType = "integer";
+      }
+      else {
+        properties[propertyExemplar] = {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    }
+    else if (dataType === "string") {
+      properties[propertyExemplar] = {
+        "type": "string"
+      };
+    }
+    else {
+      console.warn("Unhandled type for " + propertyExemplar + " " + typeof(propertyExemplar));
+    }
+  }
+  return properties;
+
 
 }
 
 
 // Create a type specification for returning the data
-function createTypeDef(typeExemplar) {
+function createTypeDef(swaggerData, typeName, typeExemplar) {
   let typeDef = {
     "type": "object",
-    properties: {}
+    properties: createPropertiesForType(swaggerData, typeName, typeExemplar, true)
   };
 
-  for (let propertyExemplar in typeExemplar) {
-    let dataExemplar = typeExemplar[propertyExemplar];
-    let dataType = typeof(dataExemplar);
-    let swaggerType = dataType;
-    if (dataType === "object") {
-      console.warn("Nested objects not implemented :", propertyExemplar);
-    } else if (dataType === "number") {
-      if (Number.isInteger(dataExemplar)) {
-        typeDef.properties[propertyExemplar] = {
-          "type": "integer",
-          "format": "int64"
-        };
-        swaggerType = "integer";
-      } else {
-        typeDef.properties[propertyExemplar] = {
-          "type": "number",
-          "format": "double"
-        }
-      }
-    } else if (dataType === "string") {
-      typeDef.properties[propertyExemplar] = {
-        "type" : "string"
-      };
-    } else {
-      console.warn("Unhandled type for " + propertyExemplar + " " + typeof(propertyExemplar));
-    }
+  swaggerData.definitions[typeName] = typeDef;
 
-
-  }
   return typeDef;
 }
 
