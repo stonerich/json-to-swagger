@@ -1,5 +1,5 @@
 {
-  "posts": [
+  "articles": [
     {
       "id": 1,
       "title": "json-server",
@@ -55,7 +55,12 @@
     {
       "id": 1,
       "body": "some comment",
-      "postId": 1
+      "articleId": 1
+    },
+    {
+      "body": "Cool comment",
+      "articleId": 1,
+      "id": 2
     }
   ],
   "profile": {

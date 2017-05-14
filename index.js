@@ -37,6 +37,7 @@ fs.readFile(options.input, function (e, data) {
 
     // Create the data
     let swaggerData = createSwaggerBase();
+    createTypeDef(swaggerData, "ErrorResponse", {});
     for (let restRoot in jsonData) {
       if (jsonData.hasOwnProperty(restRoot)) {
         createSwaggerForType(swaggerData, restRoot, jsonData[restRoot]);
@@ -128,10 +129,17 @@ function createIndividualGetSpec(typeName, dataExemplar) {
   responses["200"] = {
     description: typeName + " response",
     schema: {
-      type: "object",
+      "$ref" : `#/definitions/${typeName}`
 
     }
   };
+  responses["404"] = {
+    description: "Not found",
+    schema: {
+      "$ref": "#/definitions/ErrorResponse"
+    }
+  }
+  result.responses = responses;
 
   return result;
 
@@ -147,14 +155,16 @@ function createIndividualGetSpec(typeName, dataExemplar) {
 function createIndividualSpec(typeName, dataExemplar) {
 
   let get = createIndividualGetSpec(typeName, dataExemplar);
-  let parameters = {
-    name: "id",
-    in: "path",
-    description: "Id for " + typeName,
-    required: true,
-    type: "integer",
-    format: "int64"
-  };
+  let parameters = [
+      {
+      name: "id",
+      in: "path",
+      description: "Id for " + typeName,
+      required: true,
+      type: "integer",
+      format: "int64"
+    }
+    ];
 
   return {
     get,
