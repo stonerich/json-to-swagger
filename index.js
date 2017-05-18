@@ -101,7 +101,7 @@ function createSwaggerBase() {
  */
 function createSwaggerForType(swaggerData, restRootName, restRootData) {
   let typeName = restRootName;
-  // Simple attempt to move plural namning to singular and to have uppercase typenames
+  // Simple attempt to move plural naming to singular and to have uppercase type names
   if (typeName.endsWith('s')) {
     typeName = typeName.substr(0, typeName.length - 1);
   }
@@ -118,18 +118,17 @@ function createSwaggerForType(swaggerData, restRootName, restRootData) {
   createTypeDef(swaggerData, typeName, dataExemplar);
 }
 
-
-function createIndividualGetSpec(typeName, dataExemplar) {
-  let result = {};
-  result.summary = "Return an individual " + typeName + " with given id";
-  result.description = "Return an individual " + typeName + " with given id";
-  result.operationId = "get" + typeName + "Individual";
-
+/**
+ * Define the responses for an individual operation (GET,PUT,PATCH)
+ * @param typeName Name of the type that is given in the response
+ * @returns {{}} An object usable as a "responses" part in the operation spec
+ */
+function getResponseForIndividualOp(typeName) {
   let responses = {};
   responses["200"] = {
     description: typeName + " response",
     schema: {
-      "$ref" : `#/definitions/${typeName}`
+      "$ref": `#/definitions/${typeName}`
 
     }
   };
@@ -138,36 +137,79 @@ function createIndividualGetSpec(typeName, dataExemplar) {
     schema: {
       "$ref": "#/definitions/ErrorResponse"
     }
-  }
-  result.responses = responses;
+  };
+  return responses;
+}
+
+/**
+ * Create the 'GET' specification for and individual.
+ * The individual will be indexed with 'id' as part of the path
+ * @param typeName Name type that is delivered
+ * @returns {{}} An object usable as a 'GET' operation within a typeName/{id}
+ */
+function createIndividualGetSpec(typeName) {
+  let result = {};
+  result.summary = "Return an individual " + typeName + " with given id";
+  result.description = "Return an individual " + typeName + " with given id";
+  result.operationId = "get" + typeName + "Individual";
+  result.responses = getResponseForIndividualOp(typeName);
 
   return result;
 
 }
 
+// Put and Patch looks the same, and since json-server don't enforce
+// fields on put, don't do it here.
+function createIndividualPutOrPatchSpec(kind, typeName) {
+  let result = {};
+  let baseOp = kind[0] + kind.substr(1, kind.length - 1).toLowerCase();
+  let baseId = kind.toLowerCase();
+  result.summary = baseOp + " an " + typeName + " with given id";
+  result.description = baseOp + " an " + typeName + " with given id";
+  result.operationId = baseId + typeName + "Individual";
+  result.responses = getResponseForIndividualOp(typeName);
+
+  let dataObject = {};
+  dataObject.in = "body";
+  dataObject.name = "bodyAdd" + typeName;
+  dataObject.description = typeName + " object to be added";
+  dataObject.required = true;
+  dataObject.schema = {"$ref": "#/definitions/" + typeName};
+
+  result.parameters = [dataObject];
+  return result;
+
+}
+
+// TODO: Individual PUT - Take whole object
+// TODO: Individual PATCH - Take part, but look the same
+// TODO: Individual DELETE
 
 /**
  * Create the specification needed for an individual of the typename.
- * FORNOW: Assumes that the id attribute is named 'id'
+ * TODO: Don't assume that the id attribute is named 'id'
  * @param typeName
- * @param dataExemplar
  */
-function createIndividualSpec(typeName, dataExemplar) {
+function createIndividualSpec(typeName) {
 
-  let get = createIndividualGetSpec(typeName, dataExemplar);
-  let parameters = [
-      {
+  let get = createIndividualGetSpec(typeName);
+  let patch = createIndividualPutOrPatchSpec("PATCH", typeName);
+  let put = createIndividualPutOrPatchSpec("PUT", typeName);
+
+  let idParameter =
+    {
       name: "id",
       in: "path",
       description: "Id for " + typeName,
       required: true,
       type: "integer",
       format: "int64"
-    }
-    ];
-
+    };
+  let parameters = [idParameter];
   return {
     get,
+    patch,
+    put,
     parameters
   }
 
@@ -181,7 +223,7 @@ function createRootGetSpecification(isArray, typeName) {
   let getSpec = {};
   let respSchema = {};
 
-  getSpec.summary = isArray ? `Get all ${typeName}` : `Get the ${typeName}`;
+  getSpec.summary = isArray ? `Get all ${typeName}s` : `Get the ${typeName}`;
   getSpec.description = isArray
     ? `Get the instances of ${typeName} that matches the search conditions`
     : `Get the one ${typeName}`;
@@ -216,16 +258,16 @@ function createRootGetSpecification(isArray, typeName) {
 function createRootPostSpecification(typeName) {
   let postSpec = {};
   let respSchema = {};
-  let parameters = {};
+  let postObject = {};
   postSpec.summary = `Post a new ${typeName}`;
   postSpec.description = `Add a new ${typeName}`;
   postSpec.operationId = "post" + typeName;
 
-  parameters.in = "body";
-  parameters.name = "bodyAdd" + typeName;
-  parameters.description = typeName + " object to be added";
-  parameters.required = true;
-  parameters.schema = {"$ref": "#/definitions/" + typeName};
+  postObject.in = "body";
+  postObject.name = "bodyAdd" + typeName;
+  postObject.description = typeName + " object to be added";
+  postObject.required = true;
+  postObject.schema = {"$ref": "#/definitions/" + typeName};
 
   respSchema["$ref"] = `#/definitions/${typeName}`;
   let responses = {
@@ -234,7 +276,7 @@ function createRootPostSpecification(typeName) {
       "schema": respSchema
     }
   };
-  postSpec.parameters = [parameters];
+  postSpec.parameters = [postObject];
   postSpec.responses = responses;
   return postSpec;
 
